@@ -1,43 +1,39 @@
-// src/pages/Login.jsx
+// src/pages/Signup.jsx
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
-import { useState, useContext } from "react";
 
-const Login = () => {
-   const [email, setEmail] = useState("");
+const Signup = () => {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [confirm, setConfirm] = useState("");
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext);
 
-  const handleLogin = (e) => {
+  const handleSignup = (e) => {
     e.preventDefault();
 
-    if (email === "admin@example.com" && password === "admin123") {
-      login(); // Set auth state
-      setError("");
-      navigate("/dashboard");
-    } else {
-      setError("Invalid username or password ❌");
+    // Simple client-side validation
+    if (password !== confirm) {
+      alert("Passwords do not match!");
+      return;
     }
+
+    // Dummy logic – replace with real API call
+    console.log("User signed up with:", { email, password });
+    alert("Signup successful ✅");
+
+    // Redirect to login after signup
+    navigate("/login");
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-blue-200">
       <form
-        onSubmit={handleLogin}
+        onSubmit={handleSignup}
         className="bg-white p-8 rounded-xl shadow-md w-full max-w-md"
       >
         <h2 className="text-2xl font-bold text-blue-800 mb-6 text-center">
-          Login
+          Create an Account
         </h2>
-
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-100 text-red-700 px-4 py-2 mb-4 rounded-lg text-sm text-center">
-            {error}
-          </div>
-        )}
 
         <div className="mb-4">
           <label className="block text-blue-700 mb-1">Email</label>
@@ -50,7 +46,7 @@ const Login = () => {
           />
         </div>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="block text-blue-700 mb-1">Password</label>
           <input
             type="password"
@@ -61,15 +57,36 @@ const Login = () => {
           />
         </div>
 
+        <div className="mb-6">
+          <label className="block text-blue-700 mb-1">Confirm Password</label>
+          <input
+            type="password"
+            className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+          />
+        </div>
+
         <button
           type="submit"
           className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
         >
-          Login
+          Sign Up
         </button>
+
+        <p className="mt-4 text-center text-sm text-purple-600">
+          Already have an account?{" "}
+          <span
+            className="text-blue-800 underline cursor-pointer"
+            onClick={() => navigate("/login")}
+          >
+            Login
+          </span>
+        </p>
       </form>
     </div>
   );
 };
 
-export default Login;
+export default Signup;
