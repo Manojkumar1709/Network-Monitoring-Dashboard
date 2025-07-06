@@ -1,24 +1,32 @@
-// src/pages/Login.jsx
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useState, useContext } from "react";
+import { loginAPI } from "../services/auth";
 
 const Login = () => {
-   const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext);
+  const { login } = useContext(AuthContext); // This should accept user info
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
-    if (email === "admin@example.com" && password === "admin123") {
-      login(); // Set auth state
+    try {
+      const { user, token } = await loginAPI({ email, password });
+
+      // Save to localStorage
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // Update auth context
+      login(user); // Pass user to context (optional but recommended)
+
       setError("");
       navigate("/dashboard");
-    } else {
-      setError("Invalid username or password ❌");
+    } catch (err) {
+      setError(err.response?.data?.message || "Login failed ❌");
     }
   };
 
@@ -32,7 +40,6 @@ const Login = () => {
           Login
         </h2>
 
-        {/* Error message */}
         {error && (
           <div className="bg-red-100 text-red-700 px-4 py-2 mb-4 rounded-lg text-sm text-center">
             {error}
@@ -67,6 +74,16 @@ const Login = () => {
         >
           Login
         </button>
+
+        <p className="mt-4 text-center text-sm text-purple-600">
+          Don't Have an Account?{" "}
+          <span
+            className="text-blue-800 underline cursor-pointer"
+            onClick={() => navigate("/signup")}
+          >
+            Signup
+          </span>
+        </p>
       </form>
     </div>
   );
