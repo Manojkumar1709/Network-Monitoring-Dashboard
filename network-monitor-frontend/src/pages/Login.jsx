@@ -8,7 +8,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext); // This should accept user info
+  const { login } = useContext(AuthContext);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -20,11 +20,22 @@ const Login = () => {
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Update auth context
-      login(user); // Pass user to context (optional but recommended)
+      // Update context with full user info
+      login(user);
 
       setError("");
-      navigate("/dashboard");
+
+      // Navigate based on role
+      if (user.role === "Admin") {
+        navigate("/admin/dashboard");
+      } else if (user.role === "IT Admin") {
+        navigate("/it-admin/dashboard");
+      } else if (user.role === "User") {
+        navigate("/user/dashboard");
+      } else {
+        // fallback or unauthorized
+        navigate("/unauthorized");
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Login failed ❌");
     }

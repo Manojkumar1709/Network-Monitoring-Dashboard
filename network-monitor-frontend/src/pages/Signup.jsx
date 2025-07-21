@@ -3,8 +3,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signupAPI } from "../services/auth";
 
+
 const Signup = () => {
-  const [form, setForm] = useState({ username: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirm: "",
+    role: "User", // Default role
+  });
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -25,13 +32,11 @@ const Signup = () => {
         username: form.username,
         email: form.email,
         password: form.password,
+        role: form.role, // Include role in the request
       });
 
-      // Optional: store token or login automatically
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
-
-      // Redirect to login or dashboard
       navigate("/login");
     } catch (err) {
       setError(err.response?.data?.message || "Signup failed ❌");
@@ -90,7 +95,7 @@ const Signup = () => {
           />
         </div>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="block text-blue-700 mb-1">Confirm Password</label>
           <input
             type="password"
@@ -100,6 +105,21 @@ const Signup = () => {
             onChange={handleChange}
             required
           />
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-blue-700 mb-1">Role</label>
+          <select
+            name="role"
+            value={form.role}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            <option value="User">User</option>
+            <option value="IT Admin">IT Admin</option>
+            <option value="Admin">Admin</option>
+          </select>
         </div>
 
         <button
