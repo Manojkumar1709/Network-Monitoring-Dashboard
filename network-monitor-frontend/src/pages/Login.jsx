@@ -15,27 +15,14 @@ const Login = () => {
 
     try {
       const { user, token } = await loginAPI({ email, password });
-
-      // Save to localStorage
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      // Update context with full user info
-      login(user);
-
+      login(user, token);
       setError("");
 
-      // Navigate based on role
-      if (user.role === "Admin") {
-        navigate("/admin/dashboard");
-      } else if (user.role === "IT Admin") {
-        navigate("/it-admin/dashboard");
-      } else if (user.role === "User") {
-        navigate("/user/dashboard");
-      } else {
-        // fallback or unauthorized
-        navigate("/unauthorized");
-      }
+      // Navigate by role
+      if (user.role === "Admin") navigate("/admin/dashboard");
+      else if (user.role === "IT Admin") navigate("/it-admin/dashboard");
+      else if (user.role === "User") navigate("/user/dashboard");
+      else navigate("/unauthorized");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed ❌");
     }

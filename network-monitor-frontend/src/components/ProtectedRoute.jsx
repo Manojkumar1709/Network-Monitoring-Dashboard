@@ -7,12 +7,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, user } = useContext(AuthContext);
 
   if (!isAuthenticated) {
-    // Not logged in
     return <Navigate to="/login" replace />;
   }
 
   if (requiredRole && user?.role !== requiredRole) {
-    // Logged in but wrong role
     return <Navigate to="/unauthorized" replace />;
   }
 
