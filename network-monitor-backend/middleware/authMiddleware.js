@@ -1,3 +1,5 @@
+// network-monitor-backend/middleware/authMiddleware.js
+// authMiddleware.js
 const jwt = require('jsonwebtoken');
 
 const protect = (req, res, next) => {
