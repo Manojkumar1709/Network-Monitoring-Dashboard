@@ -3,6 +3,17 @@ import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import TerminalModal from "../components/TerminalModal";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  LineChart,
+  Line,
+} from "recharts";
 
 const AdminDashboard = () => {
   const { logout, user, token } = useContext(AuthContext);
@@ -15,14 +26,17 @@ const AdminDashboard = () => {
   const [errorAdd, setErrorAdd] = useState(null);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [selectedDeviceIp, setSelectedDeviceIp] = useState(null);
+  const [metricsDeviceIp, setMetricsDeviceIp] = useState(null);
+
+  // New states for Add User form
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserRole, setNewUserRole] = useState("User");
 
   // Redirect if user not logged or not admin
   useEffect(() => {
     if (!user || !token) {
-      console.log("User or token missing, redirecting to login");
       navigate("/login");
     } else if (user.role !== "Admin") {
-      console.log("User role is not Admin, redirecting to unauthorized");
       navigate("/unauthorized");
     }
   }, [user, token, navigate]);
@@ -97,10 +111,30 @@ const AdminDashboard = () => {
     }
   };
 
+  // Static demo handler for Add User
+  const handleAddUser = () => {
+    if (!newUserEmail.trim()) {
+      alert("Please enter a valid email");
+      return;
+    }
+    alert(`Added ${newUserRole} with email: ${newUserEmail} (static demo)`);
+    setNewUserEmail("");
+    setNewUserRole("User");
+  };
+
   if (!user || !token) {
-    // Show simple loading or blank while redirecting
     return <p className="p-8 text-center">Loading...</p>;
   }
+
+  // SAMPLE time-series metrics data for demonstration (replace with your real backend data)
+  const sampleTimeSeriesData = [
+    { time: "10:00", cpu: 20, ram: 40, network: 500 },
+    { time: "10:01", cpu: 25, ram: 42, network: 600 },
+    { time: "10:02", cpu: 18, ram: 45, network: 550 },
+    { time: "10:03", cpu: 30, ram: 48, network: 700 },
+    { time: "10:04", cpu: 28, ram: 50, network: 650 },
+    { time: "10:05", cpu: 22, ram: 47, network: 620 },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -122,6 +156,35 @@ const AdminDashboard = () => {
 
       <div className="p-8">
         <h2 className="text-3xl font-semibold text-gray-800 mb-6">Dashboard Overview</h2>
+
+        {/* ----------- Add IT Admin / User Form (NEW) ----------- */}
+        <div className="mb-6 p-4 border rounded bg-white shadow">
+          <h2 className="text-lg font-semibold mb-4">Add IT Admin / User</h2>
+          <div className="flex flex-wrap gap-4 items-center">
+            <input
+              type="email"
+              placeholder="Enter email"
+              value={newUserEmail}
+              onChange={(e) => setNewUserEmail(e.target.value)}
+              className="border p-2 rounded w-full sm:w-auto flex-grow"
+            />
+            <select
+              value={newUserRole}
+              onChange={(e) => setNewUserRole(e.target.value)}
+              className="border p-2 rounded"
+            >
+              <option value="User">User</option>
+              <option value="IT Admin">IT Admin</option>
+            </select>
+            <button
+              onClick={handleAddUser}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+        {/* ----------------------------------------------------- */}
 
         <form onSubmit={handleAddDevice} className="mb-6 flex items-center space-x-4">
           <input
@@ -201,12 +264,22 @@ const AdminDashboard = () => {
                       <td className="border px-4 py-2">{monitor.networkUsageBytes ?? "-"}</td>
                       <td className="border px-4 py-2">
                         {status === "Online" && (
-                          <button
-                            className="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-gray-900"
-                            onClick={() => setSelectedDeviceIp(ip)}
-                          >
-                            Launch Terminal
-                          </button>
+                          <>
+                            <button
+                              className="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-gray-900 mr-2"
+                              onClick={() => setSelectedDeviceIp(ip)}
+                            >
+                              Launch Terminal
+                            </button>
+                            <button
+                              className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
+                              onClick={() =>
+                                setMetricsDeviceIp(ip === metricsDeviceIp ? null : ip)
+                              }
+                            >
+                              Show Metrics
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -214,6 +287,68 @@ const AdminDashboard = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Show Line Charts below table when Show Metrics clicked */}
+        {metricsDeviceIp && (
+          <div className="bg-white shadow rounded-lg p-6 max-w-6xl mx-auto mt-8">
+            <h3 className="text-xl font-semibold mb-6 text-gray-700">
+              Performance Metrics for {metricsDeviceIp}
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* CPU Usage Line Chart */}
+              <div>
+                <h4 className="text-lg font-medium mb-2">CPU Usage (%)</h4>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={sampleTimeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* RAM Usage Line Chart */}
+              <div>
+                <h4 className="text-lg font-medium mb-2">RAM Usage (%)</h4>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={sampleTimeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="ram" stroke="#10b981" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Network Usage Line Chart */}
+              <div>
+                <h4 className="text-lg font-medium mb-2">Network Usage (Bytes)</h4>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={sampleTimeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="network" stroke="#f59e0b" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="mt-6 text-right">
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                onClick={() => setMetricsDeviceIp(null)}
+              >
+                Close Metrics
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -229,7 +364,9 @@ const AdminDashboard = () => {
 
 const OverviewCard = ({ title, value }) => (
   <div className="bg-white shadow rounded-lg p-6 flex flex-col items-center justify-center">
-    <p className="text-gray-500 uppercase tracking-wide text-sm font-semibold mb-2">{title}</p>
+    <p className="text-gray-500 uppercase tracking-wide text-sm font-semibold mb-2">
+      {title}
+    </p>
     <p className="text-3xl font-bold text-gray-900">{value}</p>
   </div>
 );
