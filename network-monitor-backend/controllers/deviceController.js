@@ -30,8 +30,8 @@ exports.getDeviceMonitoringData = async (req, res) => {
 
   try {
     // Helper function to fetch data from a specific chart
-    const fetchChart = async (chart) => {
-      const url = `http://${ip}:19999/api/v1/data?chart=${chart}&after=-5&points=1&format=json&options=percentage`;
+    const fetchChart = async (chart, options = '') => {
+      const url = `http://${ip}:19999/api/v1/data?chart=${chart}&after=-5&points=1&format=json${options}`;
       const response = await axios.get(url);
       if (!response.data || !response.data.labels || !response.data.data?.length)
         throw new Error(`Chart "${chart}" has no valid data.`);
@@ -47,41 +47,38 @@ exports.getDeviceMonitoringData = async (req, res) => {
     // --- 1. Fetch all data in parallel ---
     const [systemInfo, cpuChart, ramChart, diskChart, netChart] = await Promise.all([
       fetchInfo(),
-      fetchChart('system.cpu'),
-      fetchChart('system.ram'),
-      fetchChart('disk_space./'), // Ensure this is the correct chart name for your root disk
-      fetchChart('system.net')
+      fetchChart('system.cpu'), // Fetch raw CPU values
+      fetchChart('system.ram', '&options=percentage'), // Fetch RAM as percentage
+      fetchChart('disk_space./', '&options=percentage'), // Fetch Disk as percentage
+      fetchChart('system.net') // Fetch raw network values
     ]);
 
-    // --- 2. Extract and Format Hardware/OS Details ---
+    // --- 2. Extract and Format Hardware/OS Details from System Info ---
     const hostname = systemInfo.mirrored_hosts_status?.[0]?.hostname || 'Unknown';
     const cpuCores = systemInfo.cores_total || 'N/A';
     const osName = systemInfo.os_name || 'Unknown';
     const kernelVersion = systemInfo.kernel_version || '';
     const fullOs = `${osName} ${kernelVersion}`.trim();
     
-    // Calculate RAM in GB from bytes
+    // Calculate RAM in GB from bytes (provided by info API)
     const ramTotalBytes = systemInfo.ram_total || 0;
     const ramGb = (ramTotalBytes / (1024 * 1024 * 1024)).toFixed(2);
 
-    // Calculate Total Disk in GB from the chart (which provides MB)
-    const diskLabels = diskChart.labels;
-    const diskPoint = diskChart.data.at(-1);
-    const diskUsedMb = diskPoint[diskLabels.indexOf('used')] || 0;
-    const diskAvailMb = diskPoint[diskLabels.indexOf('avail')] || 0;
-    const diskGb = ((diskUsedMb + diskAvailMb) / 1024).toFixed(2);
+    // CORRECTED: Use the total_disk_space value directly from the info API
+    const diskTotalBytes = systemInfo.total_disk_space || 0;
+    const diskGb = (diskTotalBytes / (1024 * 1024 * 1024)).toFixed(2); // Convert bytes to GB
 
-    // --- 3. Calculate Usage Percentages ---
-    // CPU: Sum of all non-idle dimensions
+    // --- 3. Calculate Usage Percentages from Chart Data ---
+    // CPU: Sum of all non-idle dimensions from raw values
     const cpuUsagePercent = cpuChart.data.at(-1).slice(1).reduce((sum, val) => sum + (val || 0), 0);
 
     // RAM: Use the 'used' value directly from the percentage chart
     const ramUsagePercent = ramChart.data.at(-1)[ramChart.labels.indexOf('used')] || 0;
 
     // Disk: Use the 'used' value directly from the percentage chart
-    const diskUsagePercent = diskPoint[diskLabels.indexOf('used')] || 0;
+    const diskUsagePercent = diskChart.data.at(-1)[diskChart.labels.indexOf('used')] || 0;
 
-    // Network: Sum of 'received' and 'sent' (sent is negative, so we add its absolute value)
+    // Network: Sum of 'received' and 'sent' from raw chart (sent is negative)
     const netPoint = netChart.data.at(-1);
     const netIn = netPoint[netChart.labels.indexOf('received')] || 0;
     const netOut = netPoint[netChart.labels.indexOf('sent')] || 0;
@@ -103,7 +100,6 @@ exports.getDeviceMonitoringData = async (req, res) => {
 
   } catch (err) {
     console.error(`❌ Error fetching monitoring data from ${ip}:`, err.message);
-    // Provide a more specific error message if a chart fails
     if (err.message.includes('Chart')) {
         return res.status(500).json({ message: `Failed to fetch data. ${err.message}. Please check if the Netdata agent is running and the chart name is correct.` });
     }
