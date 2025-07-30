@@ -19,6 +19,7 @@ const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const deviceRoutes = require('./routes/deviceRoutes');
 
+
 // Optional routes if file missing
 let statsRoutes, alertsRoutes;
 try {
@@ -39,6 +40,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/alerts', alertsRoutes);
+
+
+
 
 // === HTTP Server & Socket.IO ===
 const server = http.createServer(app);

@@ -1,4 +1,3 @@
-// services/netdataService.js
 const axios = require("axios");
 const ping = require("ping");
 const { exec } = require("child_process");
@@ -64,15 +63,15 @@ async function fetchMetrics(ip, hostnameFallback = "Unknown") {
     const netOut = netPoint[netChart.labels.indexOf("sent")] || 0;
     const networkUsageKBps = netIn + Math.abs(netOut);
 
-    // Nmap
-    const basicScan = await new Promise((resolve) => {
+    // Nmap: get open ports
+    const openPorts = await new Promise((resolve) => {
       exec(`nmap ${ip}`, { timeout: 15000 }, (error, stdout) => {
-        if (error) return resolve("Nmap scan failed or timed out.");
-        const openPorts = stdout
+        if (error) return resolve([]);
+        const ports = stdout
           .split("\n")
           .filter((line) => line.match(/^[0-9]+\/tcp.*open/))
           .map((line) => line.trim());
-        resolve({ openPorts });
+        resolve(ports);
       });
     });
 
@@ -96,7 +95,7 @@ async function fetchMetrics(ip, hostnameFallback = "Unknown") {
       network: {
         usageKBps: parseFloat(networkUsageKBps.toFixed(2)),
       },
-      nmap: basicScan,
+      ports: openPorts, // ✅ fixed key name
     };
   } catch (err) {
     return {

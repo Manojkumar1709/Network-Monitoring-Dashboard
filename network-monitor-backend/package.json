@@ -30,6 +30,7 @@
     "node-nmap": "^4.0.0",
     "node-pty": "^1.0.0",
     "node-ssh": "^13.2.1",
+    "pdfkit": "^0.17.1",
     "ping": "^0.4.4",
     "socket.io": "^4.8.1",
     "systeminformation": "^5.27.7",
