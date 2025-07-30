@@ -3,17 +3,9 @@ import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import TerminalModal from "../components/TerminalModal";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  LineChart,
-  Line,
-} from "recharts";
+import DeviceMetrics from "../components/DeviceMetrics";
+import ExportControls from "../components/ExportControls"; // 1. Import the new component
+import Chatbot from "../components/Chatbot"; 
 
 const AdminDashboard = () => {
   const { logout, user, token } = useContext(AuthContext);
@@ -27,6 +19,10 @@ const AdminDashboard = () => {
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [selectedDeviceIp, setSelectedDeviceIp] = useState(null);
   const [metricsDeviceIp, setMetricsDeviceIp] = useState(null);
+  const [metricsHistory, setMetricsHistory] = useState({});
+  const [scanningIp, setScanningIp] = useState(null);
+  const [vulnScanResult, setVulnScanResult] = useState({});
+  const [successAdd, setSuccessAdd] = useState("");
 
   // New states for Add User form
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -70,42 +66,90 @@ const AdminDashboard = () => {
     const fetchMonitoringData = async () => {
       try {
         const results = {};
+
         for (const device of devices) {
           if (!device.ip) continue;
+
           const res = await axios.post(
             "http://localhost:5000/api/devices/monitor",
             { ip: device.ip },
             { headers: { Authorization: `Bearer ${token}` } }
           );
+
           results[device.ip] = res.data;
         }
+
         setMonitoringData(results);
+
+        setMetricsHistory((prevHistory) => {
+          const updatedHistory = { ...prevHistory };
+
+          for (const device of devices) {
+            if (!device.ip) continue;
+
+            const data = results[device.ip];
+            const timestamp = new Date().toLocaleTimeString();
+
+            const historyEntry = {
+              time: timestamp,
+              cpu: data.cpuUsagePercent,
+              ram: data.ramUsagePercent,
+              network: data.networkUsageKBps,
+            };
+
+            const existing = updatedHistory[device.ip] || [];
+            const trimmed = [...existing, historyEntry].slice(-20);
+            updatedHistory[device.ip] = trimmed;
+          }
+
+          return updatedHistory;
+        });
       } catch (err) {
         console.error("Error fetching monitoring data:", err);
       }
     };
 
+    // Initial fetch
     fetchMonitoringData();
+
+    // Set up interval for live updates
+    const interval = setInterval(fetchMonitoringData, 10000); // 10 seconds
+
+    // Cleanup on component unmount
+    return () => clearInterval(interval);
   }, [devices, token]);
 
   const handleAddDevice = async (e) => {
     e.preventDefault();
-    if (!newDeviceIp.trim()) return;
+
+    if (!newDeviceIp.trim()) {
+      setErrorAdd("Device IP cannot be empty.");
+      return;
+    }
+
+    if (!token) {
+      setErrorAdd("Authorization token is missing.");
+      return;
+    }
 
     setLoadingAdd(true);
     setErrorAdd(null);
 
     try {
-      await axios.post(
+      const response = await axios.post(
         "http://localhost:5000/api/devices/add",
-        { ip: newDeviceIp },
+        { ip: newDeviceIp.trim() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      await fetchDevices();
+
+      setSuccessAdd(`Device ${newDeviceIp} added successfully.`);
       setNewDeviceIp("");
+      await fetchDevices();
     } catch (err) {
-      setErrorAdd(err.response?.data?.message || "Failed to add device");
-      console.error("Add device error:", err);
+      console.error("❌ Add device error:", err.response || err.message);
+      setErrorAdd(
+        err.response?.data?.message || "Failed to add device. Check logs."
+      );
     } finally {
       setLoadingAdd(false);
     }
@@ -122,26 +166,31 @@ const AdminDashboard = () => {
     setNewUserRole("User");
   };
 
+  // 2. Prepare the combined data for the export component
+  const enrichedDeviceData = devices.map((device) => ({
+    ...device,
+    ...(monitoringData[device.ip] || {}),
+    vulnerabilities: vulnScanResult[device.ip] || "Not Scanned",
+    // We use the 'internalIp' from monitoring data if available, otherwise the device IP
+    internalIp:
+      (monitoringData[device.ip] && monitoringData[device.ip].internalIp) ||
+      device.ip,
+  }));
+
   if (!user || !token) {
     return <p className="p-8 text-center">Loading...</p>;
   }
-
-  // SAMPLE time-series metrics data for demonstration (replace with your real backend data)
-  const sampleTimeSeriesData = [
-    { time: "10:00", cpu: 20, ram: 40, network: 500 },
-    { time: "10:01", cpu: 25, ram: 42, network: 600 },
-    { time: "10:02", cpu: 18, ram: 45, network: 550 },
-    { time: "10:03", cpu: 30, ram: 48, network: 700 },
-    { time: "10:04", cpu: 28, ram: 50, network: 650 },
-    { time: "10:05", cpu: 22, ram: 47, network: 620 },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex justify-between items-center px-8 py-4 bg-white shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-blue-800">Network Dashboard</h1>
-          <p className="text-sm text-gray-600">Welcome, {user.username || "User"}</p>
+          <h1 className="text-2xl font-bold text-blue-800">
+            Network Dashboard
+          </h1>
+          <p className="text-sm text-gray-600">
+            Welcome, {user.username || "User"}
+          </p>
         </div>
         <button
           onClick={() => {
@@ -155,7 +204,9 @@ const AdminDashboard = () => {
       </div>
 
       <div className="p-8">
-        <h2 className="text-3xl font-semibold text-gray-800 mb-6">Dashboard Overview</h2>
+        <h2 className="text-3xl font-semibold text-gray-800 mb-6">
+          Dashboard Overview
+        </h2>
 
         {/* ----------- Add IT Admin / User Form (NEW) ----------- */}
         <div className="mb-6 p-4 border rounded bg-white shadow">
@@ -186,7 +237,13 @@ const AdminDashboard = () => {
         </div>
         {/* ----------------------------------------------------- */}
 
-        <form onSubmit={handleAddDevice} className="mb-6 flex items-center space-x-4">
+        <form
+          onSubmit={handleAddDevice}
+          className="mb-6 flex items-center space-x-4"
+        >
+          {errorAdd && <p className="text-red-500 mb-2">{errorAdd}</p>}
+          {successAdd && <p className="text-green-600 mb-2">{successAdd}</p>}
+
           <input
             type="text"
             placeholder="Enter new device IP"
@@ -220,136 +277,212 @@ const AdminDashboard = () => {
         {loadingDevices ? (
           <p>Loading devices...</p>
         ) : (
-          <div className="bg-white shadow rounded-lg p-6 overflow-auto max-h-[400px]">
-            <h3 className="text-xl font-semibold mb-4 text-gray-700">Discovered Devices</h3>
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-gray-100 text-gray-600">
-                  <th className="border px-4 py-2 text-left">IP Address</th>
-                  <th className="border px-4 py-2 text-left">MAC Address</th>
-                  <th className="border px-4 py-2 text-left">Hostname</th>
-                  <th className="border px-4 py-2 text-left">Status</th>
-                  <th className="border px-4 py-2 text-left">CPU %</th>
-                  <th className="border px-4 py-2 text-left">RAM %</th>
-                  <th className="border px-4 py-2 text-left">Disk %</th>
-                  <th className="border px-4 py-2 text-left">Network Bytes</th>
-                  <th className="border px-4 py-2 text-left">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {devices.length === 0 && (
-                  <tr>
-                    <td colSpan="9" className="text-center py-4 text-gray-500">
-                      No devices found.
-                    </td>
+          <div className="bg-white shadow rounded-lg p-6 overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-gray-700">
+                Discovered Devices
+              </h3>
+              {/* 3. Place the new component here */}
+              <ExportControls
+                deviceData={enrichedDeviceData}
+                metricsHistory={metricsHistory} // Pass the history data
+                disabled={!devices.length}
+              />
+            </div>
+
+            <div className="overflow-auto max-h-[400px]">
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-600">
+                    <th className="border px-4 py-2 text-left">IP Address</th>
+                    <th className="border px-4 py-2 text-left">Hostname</th>
+                    <th className="border px-4 py-2 text-left">Status</th>
+                    <th className="border px-4 py-2 text-left">CPU %</th>
+                    <th className="border px-4 py-2 text-left">RAM %</th>
+                    <th className="border px-4 py-2 text-left">Disk %</th>
+                    <th className="border px-4 py-2 text-left">
+                      Network Bytes
+                    </th>
+                    <th>Open Ports</th>
+                    <th className="border px-4 py-2 text-left">Action</th>
                   </tr>
-                )}
-                {devices.map(({ _id, ip, mac, hostname, status }) => {
-                  const monitor = monitoringData[ip] || {};
-                  return (
-                    <tr key={_id} className={status === "Offline" ? "bg-red-50" : "bg-white"}>
-                      <td className="border px-4 py-2">{ip || "-"}</td>
-                      <td className="border px-4 py-2">{mac || "-"}</td>
-                      <td className="border px-4 py-2">{hostname || "-"}</td>
+                </thead>
+                <tbody>
+                  {devices.length === 0 && (
+                    <tr>
                       <td
-                        className={`border px-4 py-2 font-semibold ${
-                          status === "Online" ? "text-green-600" : "text-red-600"
-                        }`}
+                        colSpan="9"
+                        className="text-center py-4 text-gray-500"
                       >
-                        {status || "-"}
-                      </td>
-                      <td className="border px-4 py-2">{monitor.cpuUsagePercent ?? "-"}</td>
-                      <td className="border px-4 py-2">{monitor.ramUsagePercent ?? "-"}</td>
-                      <td className="border px-4 py-2">{monitor.diskUsagePercent ?? "-"}</td>
-                      <td className="border px-4 py-2">{monitor.networkUsageBytes ?? "-"}</td>
-                      <td className="border px-4 py-2">
-                        {status === "Online" && (
-                          <>
-                            <button
-                              className="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-gray-900 mr-2"
-                              onClick={() => setSelectedDeviceIp(ip)}
-                            >
-                              Launch Terminal
-                            </button>
-                            <button
-                              className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
-                              onClick={() =>
-                                setMetricsDeviceIp(ip === metricsDeviceIp ? null : ip)
-                              }
-                            >
-                              Show Metrics
-                            </button>
-                          </>
-                        )}
+                        No devices found.
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  )}
+                  {devices.map(({ _id, ip, mac, hostname, status }) => {
+                    const monitor = monitoringData[ip] || {};
+                    return (
+                      <tr
+                        key={_id}
+                        className={
+                          status === "Offline" ? "bg-red-50" : "bg-white"
+                        }
+                      >
+                        <td className="border px-4 py-2">{ip || "-"}</td>
+                        <td className="border px-4 py-2">{hostname || "-"}</td>
+                        <td
+                          className={`border px-4 py-2 font-semibold ${
+                            status === "Online"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {status || "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {monitor.cpuUsagePercent ?? "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {monitor.ramUsagePercent ?? "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {monitor.diskUsagePercent ?? "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {monitor.networkUsageKBps != null
+                            ? `${monitor.networkUsageKBps} kbps`
+                            : "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {monitor.basicScan?.openPorts?.length > 0 ? (
+                            <pre className="whitespace-pre-wrap font-mono text-sm">
+                              {monitor.basicScan.openPorts
+                                .map((entry) => {
+                                  const [port, state, service] = entry
+                                    .trim()
+                                    .split(/\s+/);
+                                  return `${port.padEnd(10)} ${state.padEnd(
+                                    10
+                                  )} ${service}`;
+                                })
+                                .join("\n")}
+                            </pre>
+                          ) : (
+                            "N/A"
+                          )}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {status === "Online" && (
+                            <>
+                              <button
+                                className="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-gray-900 mr-2"
+                                onClick={() => setSelectedDeviceIp(ip)}
+                              >
+                                Launch Terminal
+                              </button>
+                              <button
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
+                                onClick={() =>
+                                  setMetricsDeviceIp(
+                                    ip === metricsDeviceIp ? null : ip
+                                  )
+                                }
+                              >
+                                Show Metrics
+                              </button>
+                              <button
+                                className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700 ml-2"
+                                onClick={async () => {
+                                  if (window.confirm(`Delete device ${ip}?`)) {
+                                    try {
+                                      // ✅ FIX: Send the device IP instead of the _id
+                                      await axios.delete(
+                                        `http://localhost:5000/api/devices/${ip}`,
+                                        {
+                                          headers: {
+                                            Authorization: `Bearer ${token}`,
+                                          },
+                                        } // Also added the required auth header
+                                      );
+                                      // Re-fetch the device list to ensure the UI is up to date
+                                      fetchDevices();
+                                    } catch (err) {
+                                      console.error(
+                                        "Failed to delete device:",
+                                        err
+                                      );
+                                      alert("Failed to delete device.");
+                                    }
+                                  }
+                                }}
+                              >
+                                Delete
+                              </button>
+                              <button
+                                className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700 ml-2"
+                                onClick={async () => {
+                                  setScanningIp(ip);
+                                  try {
+                                    const res = await axios.post(
+                                      "http://localhost:5000/api/vuln-scan",
+                                      { ip }
+                                    );
+                                    setVulnScanResult((prev) => ({
+                                      ...prev,
+                                      [ip]: res.data.output,
+                                    }));
+                                  } catch (err) {
+                                    console.error(
+                                      "Vulnerability scan failed:",
+                                      err
+                                    );
+                                    alert(
+                                      "Vulnerability scan failed. Check backend logs."
+                                    );
+                                  } finally {
+                                    setScanningIp(null);
+                                  }
+                                }}
+                              >
+                                {scanningIp === ip
+                                  ? "Scanning..."
+                                  : "Vuln Scan"}
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {Object.keys(vulnScanResult).length > 0 && (
+              <div className="bg-white shadow rounded-lg p-6 mt-8">
+                <h3 className="text-xl font-semibold mb-4 text-gray-700">
+                  Vulnerability Scan Results
+                </h3>
+                {Object.entries(vulnScanResult).map(([ip, result]) => (
+                  <div key={ip} className="mb-4">
+                    <h4 className="font-semibold text-blue-700 mb-2">{ip}</h4>
+                    <pre className="bg-gray-100 p-4 rounded overflow-auto whitespace-pre-wrap text-sm">
+                      {result}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Show Line Charts below table when Show Metrics clicked */}
         {metricsDeviceIp && (
-          <div className="bg-white shadow rounded-lg p-6 max-w-6xl mx-auto mt-8">
-            <h3 className="text-xl font-semibold mb-6 text-gray-700">
-              Performance Metrics for {metricsDeviceIp}
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* CPU Usage Line Chart */}
-              <div>
-                <h4 className="text-lg font-medium mb-2">CPU Usage (%)</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={sampleTimeSeriesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* RAM Usage Line Chart */}
-              <div>
-                <h4 className="text-lg font-medium mb-2">RAM Usage (%)</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={sampleTimeSeriesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="ram" stroke="#10b981" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Network Usage Line Chart */}
-              <div>
-                <h4 className="text-lg font-medium mb-2">Network Usage (Bytes)</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={sampleTimeSeriesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="network" stroke="#f59e0b" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="mt-6 text-right">
-              <button
-                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                onClick={() => setMetricsDeviceIp(null)}
-              >
-                Close Metrics
-              </button>
-            </div>
-          </div>
+          <DeviceMetrics
+            ip={metricsDeviceIp}
+            monitoringData={monitoringData}
+            metricsHistory={metricsHistory}
+            onClose={() => setMetricsDeviceIp(null)}
+          />
         )}
       </div>
 
@@ -358,6 +491,7 @@ const AdminDashboard = () => {
         onClose={() => setSelectedDeviceIp(null)}
         ip={selectedDeviceIp}
       />
+      <Chatbot /> 
     </div>
   );
 };
