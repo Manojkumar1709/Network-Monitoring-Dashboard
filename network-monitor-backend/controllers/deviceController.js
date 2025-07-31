@@ -39,11 +39,9 @@ exports.addDevice = async (req, res) => {
     const chartKeys = Object.keys(chartsResponse.data.charts);
     const diskChartName = findRootDiskChart(chartKeys);
     if (!diskChartName) {
-      return res
-        .status(404)
-        .json({
-          message: "Could not find a valid root disk chart on the device.",
-        });
+      return res.status(404).json({
+        message: "Could not find a valid root disk chart on the device.",
+      });
     }
 
     const fetchChart = (chart, options = "") =>
@@ -275,4 +273,37 @@ exports.exportDevices = async (req, res) => {
       .status(500)
       .json({ message: "Failed to export devices", error: err.message });
   }
+};
+
+exports.runVulnerabilityScan = async (req, res) => {
+  const { ip } = req.body;
+
+  if (!ip) {
+    return res.status(400).json({ message: "IP address is required" });
+  }
+
+  console.log(`Starting Nmap vulnerability scan for ${ip}...`);
+
+  // Execute the Nmap vulnerability script.
+  // This can take a long time, so the timeout is increased to 10 minutes (600000 ms).
+  exec(
+    `nmap -sV --script vuln ${ip}`,
+    { timeout: 600000 },
+    (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Nmap vuln scan error for ${ip}:`, error.message);
+        // Even if there's an error, send back whatever output was captured
+        return res.status(500).json({
+          message: "Vulnerability scan failed or timed out.",
+          output: stdout || stderr,
+        });
+      }
+
+      console.log(`Vulnerability scan for ${ip} completed.`);
+      res.json({
+        message: "Vulnerability scan completed",
+        output: stdout,
+      });
+    }
+  );
 };
