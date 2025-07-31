@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 // Main Chatbot Component
-export default function Chatbot() {
+export default function App() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { sender: 'bot', text: 'Hello! How can I help you with your network monitoring today?' }
@@ -9,6 +9,12 @@ export default function Chatbot() {
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // --- Environment Variable ---
+  // In a Vite project, environment variables must be prefixed with VITE_
+  // to be accessible on the client. Make sure your .env file has:
+  // VITE_GEMINI_API_KEY=YOUR_API_KEY_HERE
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
   // Function to scroll to the latest message
   const scrollToBottom = () => {
@@ -21,18 +27,31 @@ export default function Chatbot() {
   const handleSendMessage = async () => {
     if (userInput.trim() === '' || isLoading) return;
 
+    // --- API Key Check ---
+    // First, verify that the API key is available.
+    if (!apiKey) {
+      console.error("VITE_GEMINI_API_KEY is not set. Please check your .env file.");
+      const userMessage = { sender: 'user', text: userInput };
+      const errorMessage = { sender: 'bot', text: 'Configuration Error: The API key is missing. Please ensure it is correctly set up.' };
+      setMessages(prev => [...prev, userMessage, errorMessage]);
+      setUserInput('');
+      return;
+    }
+
     const newMessages = [...messages, { sender: 'user', text: userInput }];
     setMessages(newMessages);
+    const currentInput = userInput;
     setUserInput('');
     setIsLoading(true);
 
     try {
       // --- Gemini API Call ---
-      const prompt = `You are a helpful assistant for a network monitoring dashboard. The user is asking for help with a potential device error or a general question. The user's message is: "${userInput}". Provide a concise, helpful, and easy-to-understand response. If you suggest a command, wrap it in backticks.`;
+      const prompt = `You are a helpful assistant for a network monitoring dashboard. The user is asking for help with a potential device error or a general question. The user's message is: "${currentInput}". Provide a concise, helpful, and easy-to-understand response. If you suggest a command, wrap it in backticks.`;
       
       const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
       const payload = { contents: chatHistory };
-      const apiKey = ""; // API key is handled by the environment
+      
+      // The API URL for the Gemini model
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
       const response = await fetch(apiUrl, {
@@ -42,7 +61,10 @@ export default function Chatbot() {
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        // If the response is not OK, try to parse the error message from the body
+        const errorData = await response.json().catch(() => null); // Gracefully handle non-JSON responses
+        const errorMessage = errorData?.error?.message || `API request failed with status ${response.status}`;
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -54,10 +76,11 @@ export default function Chatbot() {
         botResponse = result.candidates[0].content.parts[0].text;
       }
       
-      setMessages([...newMessages, { sender: 'bot', text: botResponse }]);
+      setMessages(prevMessages => [...prevMessages, { sender: 'bot', text: botResponse }]);
     } catch (error) {
       console.error("Error fetching from Gemini API:", error);
-      setMessages([...newMessages, { sender: 'bot', text: 'There was an error connecting to the assistant. Please check the console for details.' }]);
+      // Display the specific error message from the throw statement in the chat
+      setMessages(prevMessages => [...prevMessages, { sender: 'bot', text: error.message }]);
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +120,11 @@ export default function Chatbot() {
           type="text"
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              handleSendMessage();
+            }
+          }}
           placeholder="Ask for help..."
           className="flex-1 bg-gray-700 text-white border border-gray-600 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isLoading}
