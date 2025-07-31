@@ -1,10 +1,10 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, Fragment } from "react"; // ✅ Import Fragment
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import DeviceMetrics from "../components/DeviceMetrics";
 import ExportControls from "../components/ExportControls";
-import Chatbot from "../components/Chatbot"; 
+import Chatbot from "../components/Chatbot";
 
 const UserDashboard = () => {
   const { logout, user, token } = useContext(AuthContext);
@@ -173,7 +173,9 @@ const UserDashboard = () => {
                     <tr><td colSpan="9" className="text-center py-4 text-gray-500">No devices found.</td></tr>
                   )}
                   {enrichedDeviceData.map((device) => (
-                      <tr key={device._id} className={device.status === "Offline" ? "bg-red-50" : "bg-white"}>
+                    // ✅ Wrap the rows in a Fragment
+                    <Fragment key={device._id}>
+                      <tr className={device.status === "Offline" ? "bg-red-50" : "bg-white"}>
                         <td className="border px-4 py-2">{device.ip || "-"}</td>
                         <td className="border px-4 py-2">{device.hostname || "-"}</td>
                         <td className={`border px-4 py-2 font-semibold ${device.status === "Online" ? "text-green-600" : "text-red-600"}`}>
@@ -192,37 +194,54 @@ const UserDashboard = () => {
                           {device.status === "Online" && (
                             <div className="flex flex-wrap gap-2">
                               <button className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700" onClick={() => setMetricsDeviceIp(ip => ip === device.ip ? null : device.ip)}>Metrics</button>
-                              <button className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700" onClick={async () => {
-                                setScanningIp(device.ip);
-                                try {
-                                  const res = await axios.post("http://localhost:5000/api/vuln-scan", { ip: device.ip }, { headers: { Authorization: `Bearer ${token}` } });
-                                  setVulnScanResult((prev) => ({ ...prev, [device.ip]: res.data.output }));
-                                } catch (err) { alert("Vulnerability scan failed."); } 
-                                finally { setScanningIp(null); }
-                              }}>
+                              
+                              {/* ✅ Updated vulnerability scan button */}
+                              <button 
+                                className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700 disabled:opacity-50"
+                                disabled={scanningIp === device.ip}
+                                onClick={async () => {
+                                  setScanningIp(device.ip);
+                                  try {
+                                    // Corrected API endpoint
+                                    const res = await axios.post("http://localhost:5000/api/devices/vuln-scan", { ip: device.ip }, { headers: { Authorization: `Bearer ${token}` } });
+                                    setVulnScanResult((prev) => ({ ...prev, [device.ip]: res.data.output }));
+                                  } catch (err) {
+                                    console.error("Vulnerability scan failed:", err);
+                                    alert("Vulnerability scan failed."); 
+                                  } finally { 
+                                    setScanningIp(null); 
+                                  }
+                                }}>
                                 {scanningIp === device.ip ? "Scanning..." : "Vuln Scan"}
                               </button>
                             </div>
                           )}
                         </td>
                       </tr>
-                    ))}
+
+                      {/* ✅ Conditionally render the scan result row */}
+                      {vulnScanResult[device.ip] && (
+                        <tr className="bg-gray-50">
+                          <td colSpan="9" className="p-2">
+                            <div className="bg-gray-100 p-3 rounded">
+                              <h4 className="font-semibold text-gray-800 mb-2">Scan Result for {device.ip}:</h4>
+                              <pre className="bg-gray-900 text-green-300 p-4 rounded-md text-xs whitespace-pre-wrap overflow-auto">
+                                {vulnScanResult[device.ip]}
+                              </pre>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
         )}
-        {Object.keys(vulnScanResult).length > 0 && (
-          <div className="bg-white shadow rounded-lg p-6 mt-8">
-            <h3 className="text-xl font-semibold mb-4 text-gray-700">Vulnerability Scan Results</h3>
-            {Object.entries(vulnScanResult).map(([ip, result]) => (
-              <div key={ip} className="mb-4">
-                <h4 className="font-semibold text-blue-700 mb-2">{ip}</h4>
-                <pre className="bg-gray-100 p-4 rounded overflow-auto whitespace-pre-wrap text-sm">{result}</pre>
-              </div>
-            ))}
-          </div>
-        )}
+        
+        {/* ✅ The separate, redundant results section has been removed */}
+
         {metricsDeviceIp && (
           <DeviceMetrics ip={metricsDeviceIp} monitoringData={monitoringData} metricsHistory={metricsHistory} onClose={() => setMetricsDeviceIp(null)} />
         )}

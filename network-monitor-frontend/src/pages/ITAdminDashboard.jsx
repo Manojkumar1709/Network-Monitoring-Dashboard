@@ -1,10 +1,10 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, Fragment } from "react"; // ✅ Import Fragment
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import DeviceMetrics from "../components/DeviceMetrics";
 import ExportControls from "../components/ExportControls";
-import Chatbot from "../components/Chatbot"; 
+import Chatbot from "../components/Chatbot";
 
 const ItAdminDashboard = () => {
   const { logout, user, token } = useContext(AuthContext);
@@ -69,8 +69,14 @@ const ItAdminDashboard = () => {
             );
             results[device.ip] = res.data;
           } catch (monitorError) {
-            console.error(`Could not monitor device ${device.ip}:`, monitorError.message);
-            results[device.ip] = { ...monitoringData[device.ip], status: 'Offline' };
+            console.error(
+              `Could not monitor device ${device.ip}:`,
+              monitorError.message
+            );
+            results[device.ip] = {
+              ...monitoringData[device.ip],
+              status: "Offline",
+            };
           }
         }
 
@@ -79,7 +85,12 @@ const ItAdminDashboard = () => {
         setMetricsHistory((prevHistory) => {
           const updatedHistory = { ...prevHistory };
           for (const device of devices) {
-            if (!device.ip || !results[device.ip] || results[device.ip].status === 'Offline') continue;
+            if (
+              !device.ip ||
+              !results[device.ip] ||
+              results[device.ip].status === "Offline"
+            )
+              continue;
             const data = results[device.ip];
             const timestamp = new Date().toLocaleTimeString();
             const historyEntry = {
@@ -129,18 +140,18 @@ const ItAdminDashboard = () => {
     }
   };
 
-  const enrichedDeviceData = devices.map(device => {
+  const enrichedDeviceData = devices.map((device) => {
     const liveData = monitoringData[device.ip] || {};
     const displayData = { ...device, ...liveData };
-    
+
     return {
       ...displayData,
       internalIp: liveData.internalIp || device.ip,
-      vulnerabilities: vulnScanResult[device.ip] || 'Not Scanned',
+      vulnerabilities: vulnScanResult[device.ip] || "Not Scanned",
       ports: liveData.basicScan?.openPorts || device.basicScan?.openPorts || [],
     };
   });
-  
+
   if (!user || !token) {
     return <p className="p-8 text-center">Loading...</p>;
   }
@@ -149,8 +160,12 @@ const ItAdminDashboard = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="flex justify-between items-center px-8 py-4 bg-white shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-blue-800">IT Admin Dashboard</h1>
-          <p className="text-sm text-gray-600">Welcome, {user.username || "User"}</p>
+          <h1 className="text-2xl font-bold text-blue-800">
+            IT Admin Dashboard
+          </h1>
+          <p className="text-sm text-gray-600">
+            Welcome, {user.username || "User"}
+          </p>
         </div>
         <button
           onClick={() => {
@@ -164,24 +179,50 @@ const ItAdminDashboard = () => {
       </div>
 
       <div className="p-8">
-        <h2 className="text-3xl font-semibold text-gray-800 mb-6">Dashboard Overview</h2>
-        
-        <form onSubmit={handleAddDevice} className="mb-6 p-4 border rounded bg-white shadow">
-            <h2 className="text-lg font-semibold mb-4">Add New Device</h2>
-            <div className="flex items-center space-x-4">
-                <input type="text" placeholder="Enter new device IP" value={newDeviceIp} onChange={(e) => setNewDeviceIp(e.target.value)} className="border border-gray-300 rounded px-3 py-2 w-64" disabled={loadingAdd} />
-                <button type="submit" disabled={loadingAdd} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50">
-                    {loadingAdd ? "Adding..." : "Add Device"}
-                </button>
-            </div>
-            {errorAdd && <p className="text-red-600 mt-2">{errorAdd}</p>}
-            {successAdd && <p className="text-green-600 mt-2">{successAdd}</p>}
+        <h2 className="text-3xl font-semibold text-gray-800 mb-6">
+          Dashboard Overview
+        </h2>
+
+        <form
+          onSubmit={handleAddDevice}
+          className="mb-6 p-4 border rounded bg-white shadow"
+        >
+          <h2 className="text-lg font-semibold mb-4">Add New Device</h2>
+          <div className="flex items-center space-x-4">
+            <input
+              type="text"
+              placeholder="Enter new device IP"
+              value={newDeviceIp}
+              onChange={(e) => setNewDeviceIp(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-2 w-64"
+              disabled={loadingAdd}
+            />
+            <button
+              type="submit"
+              disabled={loadingAdd}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              {loadingAdd ? "Adding..." : "Add Device"}
+            </button>
+          </div>
+          {errorAdd && <p className="text-red-600 mt-2">{errorAdd}</p>}
+          {successAdd && <p className="text-green-600 mt-2">{successAdd}</p>}
         </form>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
           <OverviewCard title="Total Devices" value={devices.length} />
-          <OverviewCard title="Online Devices" value={enrichedDeviceData.filter((d) => d.status === "Online").length} />
-          <OverviewCard title="Offline Devices" value={enrichedDeviceData.filter((d) => d.status !== "Online").length} />
+          <OverviewCard
+            title="Online Devices"
+            value={
+              enrichedDeviceData.filter((d) => d.status === "Online").length
+            }
+          />
+          <OverviewCard
+            title="Offline Devices"
+            value={
+              enrichedDeviceData.filter((d) => d.status !== "Online").length
+            }
+          />
         </div>
 
         {loadingDevices ? (
@@ -189,8 +230,14 @@ const ItAdminDashboard = () => {
         ) : (
           <div className="bg-white shadow rounded-lg p-6 overflow-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-gray-700">Discovered Devices</h3>
-              <ExportControls deviceData={enrichedDeviceData} metricsHistory={metricsHistory} disabled={!devices.length} />
+              <h3 className="text-xl font-semibold text-gray-700">
+                Discovered Devices
+              </h3>
+              <ExportControls
+                deviceData={enrichedDeviceData}
+                metricsHistory={metricsHistory}
+                disabled={!devices.length}
+              />
             </div>
             <div className="overflow-auto max-h-[400px]">
               <table className="min-w-full border-collapse text-sm">
@@ -202,78 +249,167 @@ const ItAdminDashboard = () => {
                     <th className="border px-4 py-2 text-left">CPU %</th>
                     <th className="border px-4 py-2 text-left">RAM %</th>
                     <th className="border px-4 py-2 text-left">Disk %</th>
-                    <th className="border px-4 py-2 text-left">Network (KB/s)</th>
+                    <th className="border px-4 py-2 text-left">
+                      Network (KB/s)
+                    </th>
                     <th className="border px-4 py-2 text-left">Open Ports</th>
                     <th className="border px-4 py-2 text-left">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {devices.length === 0 && (
-                    <tr><td colSpan="9" className="text-center py-4 text-gray-500">No devices found.</td></tr>
+                    <tr>
+                      <td
+                        colSpan="9"
+                        className="text-center py-4 text-gray-500"
+                      >
+                        No devices found.
+                      </td>
+                    </tr>
                   )}
                   {enrichedDeviceData.map((device) => (
-                      <tr key={device._id} className={device.status === "Offline" ? "bg-red-50" : "bg-white"}>
+                    // ✅ Wrap the rows in a Fragment
+                    <Fragment key={device._id}>
+                      <tr
+                        className={
+                          device.status === "Offline" ? "bg-red-50" : "bg-white"
+                        }
+                      >
                         <td className="border px-4 py-2">{device.ip || "-"}</td>
-                        <td className="border px-4 py-2">{device.hostname || "-"}</td>
-                        <td className={`border px-4 py-2 font-semibold ${device.status === "Online" ? "text-green-600" : "text-red-600"}`}>
+                        <td className="border px-4 py-2">
+                          {device.hostname || "-"}
+                        </td>
+                        <td
+                          className={`border px-4 py-2 font-semibold ${
+                            device.status === "Online"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
                           {device.status || "Unknown"}
                         </td>
-                        <td className="border px-4 py-2">{device.cpuUsagePercent ?? "-"}</td>
-                        <td className="border px-4 py-2">{device.ramUsagePercent ?? "-"}</td>
-                        <td className="border px-4 py-2">{device.diskUsagePercent ?? "-"}</td>
-                        <td className="border px-4 py-2">{device.networkUsageKBps != null ? `${device.networkUsageKBps} kbps` : "-"}</td>
+                        <td className="border px-4 py-2">
+                          {device.cpuUsagePercent ?? "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {device.ramUsagePercent ?? "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {device.diskUsagePercent ?? "-"}
+                        </td>
+                        <td className="border px-4 py-2">
+                          {device.networkUsageKBps != null
+                            ? `${device.networkUsageKBps} kbps`
+                            : "-"}
+                        </td>
                         <td className="border px-4 py-2">
                           {device.ports && device.ports.length > 0 ? (
-                            <pre className="whitespace-pre-wrap font-mono text-xs">{device.ports.join("\n")}</pre>
-                          ) : "N/A"}
+                            <pre className="whitespace-pre-wrap font-mono text-xs">
+                              {device.ports.join("\n")}
+                            </pre>
+                          ) : (
+                            "N/A"
+                          )}
                         </td>
                         <td className="border px-4 py-2">
                           {device.status === "Online" && (
                             <div className="flex flex-wrap gap-2">
-                              <button className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700" onClick={() => setMetricsDeviceIp(ip => ip === device.ip ? null : device.ip)}>Metrics</button>
-                              <button className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700" onClick={async () => {
-                                setScanningIp(device.ip);
-                                try {
-                                  const res = await axios.post("http://localhost:5000/api/vuln-scan", { ip: device.ip }, { headers: { Authorization: `Bearer ${token}` } });
-                                  setVulnScanResult((prev) => ({ ...prev, [device.ip]: res.data.output }));
-                                } catch (err) { alert("Vulnerability scan failed."); } 
-                                finally { setScanningIp(null); }
-                              }}>
-                                {scanningIp === device.ip ? "Scanning..." : "Vuln Scan"}
+                              <button
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700"
+                                onClick={() =>
+                                  setMetricsDeviceIp((ip) =>
+                                    ip === device.ip ? null : device.ip
+                                  )
+                                }
+                              >
+                                Metrics
+                              </button>
+
+                              {/* ✅ Updated vulnerability scan button */}
+                              <button
+                                className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700 disabled:opacity-50"
+                                disabled={scanningIp === device.ip}
+                                onClick={async () => {
+                                  setScanningIp(device.ip);
+                                  try {
+                                    // Corrected API endpoint
+                                    const res = await axios.post(
+                                      "http://localhost:5000/api/devices/vuln-scan",
+                                      { ip: device.ip },
+                                      {
+                                        headers: {
+                                          Authorization: `Bearer ${token}`,
+                                        },
+                                      }
+                                    );
+                                    setVulnScanResult((prev) => ({
+                                      ...prev,
+                                      [device.ip]: res.data.output,
+                                    }));
+                                  } catch (err) {
+                                    console.error(
+                                      "Vulnerability scan failed:",
+                                      err
+                                    );
+                                    alert("Vulnerability scan failed.");
+                                  } finally {
+                                    setScanningIp(null);
+                                  }
+                                }}
+                              >
+                                {scanningIp === device.ip
+                                  ? "Scanning..."
+                                  : "Vuln Scan"}
                               </button>
                             </div>
                           )}
                         </td>
                       </tr>
-                    ))}
+
+                      {/* ✅ Conditionally render the scan result row */}
+                      {vulnScanResult[device.ip] && (
+                        <tr className="bg-gray-50">
+                          <td colSpan="9" className="p-2">
+                            <div className="bg-gray-100 p-3 rounded">
+                              <h4 className="font-semibold text-gray-800 mb-2">
+                                Scan Result for {device.ip}:
+                              </h4>
+                              <pre className="bg-gray-900 text-green-300 p-4 rounded-md text-xs whitespace-pre-wrap overflow-auto">
+                                {vulnScanResult[device.ip]}
+                              </pre>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
         )}
-        {Object.keys(vulnScanResult).length > 0 && (
-          <div className="bg-white shadow rounded-lg p-6 mt-8">
-            <h3 className="text-xl font-semibold mb-4 text-gray-700">Vulnerability Scan Results</h3>
-            {Object.entries(vulnScanResult).map(([ip, result]) => (
-              <div key={ip} className="mb-4">
-                <h4 className="font-semibold text-blue-700 mb-2">{ip}</h4>
-                <pre className="bg-gray-100 p-4 rounded overflow-auto whitespace-pre-wrap text-sm">{result}</pre>
-              </div>
-            ))}
-          </div>
-        )}
+
+        {/* ✅ The separate, redundant results section has been removed */}
+
         {metricsDeviceIp && (
-          <DeviceMetrics ip={metricsDeviceIp} monitoringData={monitoringData} metricsHistory={metricsHistory} onClose={() => setMetricsDeviceIp(null)} />
+          <DeviceMetrics
+            ip={metricsDeviceIp}
+            monitoringData={monitoringData}
+            metricsHistory={metricsHistory}
+            onClose={() => setMetricsDeviceIp(null)}
+          />
         )}
       </div>
-      <Chatbot /> 
+      <Chatbot />
     </div>
   );
 };
 
 const OverviewCard = ({ title, value }) => (
   <div className="bg-white shadow rounded-lg p-6 flex flex-col items-center justify-center">
-    <p className="text-gray-500 uppercase tracking-wide text-sm font-semibold mb-2">{title}</p>
+    <p className="text-gray-500 uppercase tracking-wide text-sm font-semibold mb-2">
+      {title}
+    </p>
     <p className="text-3xl font-bold text-gray-900">{value}</p>
   </div>
 );
