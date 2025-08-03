@@ -11,21 +11,28 @@ const AdminDashboard = () => {
   const { logout, user, token } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  // --- Device States ---
   const [devices, setDevices] = useState([]);
   const [monitoringData, setMonitoringData] = useState({});
   const [newDeviceIp, setNewDeviceIp] = useState("");
   const [loadingAdd, setLoadingAdd] = useState(false);
   const [errorAdd, setErrorAdd] = useState(null);
+  const [successAdd, setSuccessAdd] = useState("");
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [selectedDeviceIp, setSelectedDeviceIp] = useState(null);
   const [metricsDeviceIp, setMetricsDeviceIp] = useState(null);
   const [metricsHistory, setMetricsHistory] = useState({});
   const [scanningIp, setScanningIp] = useState(null);
   const [vulnScanResult, setVulnScanResult] = useState({});
-  const [successAdd, setSuccessAdd] = useState("");
+  //const [successAddUser, setSuccessAddUser] = useState("");
+  const [newlyCreatedUser, setNewlyCreatedUser] = useState(null);
 
+  // --- New User States ---
   const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserRole, setNewUserRole] = useState("User");
+  const [newUserRole, setNewUserRole] = useState("user"); // Default to 'user'
+  const [loadingAddUser, setLoadingAddUser] = useState(false);
+  const [errorAddUser, setErrorAddUser] = useState(null);
+  const [successAddUser, setSuccessAddUser] = useState("");
 
   useEffect(() => {
     if (!user || !token) {
@@ -133,14 +140,42 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleAddUser = () => {
-    if (!newUserEmail.trim()) {
-      alert("Please enter a valid email");
+  const handleAddUser = async () => {
+    // Clear previous messages and credentials
+    setErrorAddUser(null);
+    setSuccessAddUser("");
+    setNewlyCreatedUser(null);
+
+    if (!newUserEmail.trim() || !/^\S+@\S+\.\S+$/.test(newUserEmail)) {
+      setErrorAddUser("Please enter a valid email address.");
       return;
     }
-    alert(`Added ${newUserRole} with email: ${newUserEmail} (static demo)`);
-    setNewUserEmail("");
-    setNewUserRole("User");
+
+    setLoadingAddUser(true);
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/admin/users",
+        { email: newUserEmail, role: newUserRole },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Store the new user's credentials from the response
+      setNewlyCreatedUser({
+        email: res.data.email,
+        password: res.data.password,
+      });
+      setSuccessAddUser(res.data.message); // Keep the success message
+
+      setNewUserEmail(""); // Clear form on success
+      setNewUserRole("user");
+    } catch (err) {
+      setErrorAddUser(
+        err.response?.data?.message || "An error occurred. Please try again."
+      );
+      console.error("❌ Add user error:", err.response || err.message);
+    } finally {
+      setLoadingAddUser(false);
+    }
   };
 
   const enrichedDeviceData = devices.map((device) => ({
@@ -164,7 +199,7 @@ const AdminDashboard = () => {
             Network Dashboard
           </h1>
           <p className="text-sm text-gray-600">
-            Welcome, {user.username || "User"}
+            Welcome, {user.username || "Admin"}
           </p>
         </div>
         <button
@@ -184,31 +219,73 @@ const AdminDashboard = () => {
         </h2>
 
         {/* Add User Form */}
+        {/* Add User Form */}
         <div className="mb-6 p-4 border rounded bg-white shadow">
-          <h2 className="text-lg font-semibold mb-4">Add IT Admin / User</h2>
+          <h2 className="text-lg font-semibold mb-2">Add IT Admin / User</h2>
+
+          {/* Error and Success Messages */}
+          {errorAddUser && (
+            <p className="text-red-500 text-sm mb-2">{errorAddUser}</p>
+          )}
+          {successAddUser && !newlyCreatedUser && (
+            <p className="text-green-600 text-sm mb-2">{successAddUser}</p>
+          )}
+
           <div className="flex flex-wrap gap-4 items-center">
             <input
               type="email"
               placeholder="Enter email"
               value={newUserEmail}
-              onChange={(e) => setNewUserEmail(e.target.value)}
+              onChange={(e) => {
+                setNewUserEmail(e.target.value);
+                setNewlyCreatedUser(null); // Clear credentials when typing
+                setSuccessAddUser("");
+              }}
               className="border p-2 rounded w-full sm:w-auto flex-grow"
+              disabled={loadingAddUser}
             />
             <select
               value={newUserRole}
               onChange={(e) => setNewUserRole(e.target.value)}
               className="border p-2 rounded"
+              disabled={loadingAddUser}
             >
-              <option value="User">User</option>
-              <option value="IT Admin">IT Admin</option>
+              <option value="user">User</option>
+              <option value="it-admin">IT Admin</option>
             </select>
             <button
               onClick={handleAddUser}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition disabled:opacity-50"
+              disabled={loadingAddUser}
             >
-              Add
+              {loadingAddUser ? "Adding..." : "Add"}
             </button>
           </div>
+
+          {/* Display New Credentials Here */}
+          {newlyCreatedUser && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+              <h3 className="font-bold text-green-800">{successAddUser}</h3>
+              <div className="mt-2 font-mono text-sm">
+                <p>
+                  <strong>Email: </strong> {newlyCreatedUser.email}
+                </p>
+                <div className="flex items-center gap-3">
+                  <p>
+                    <strong>Password: </strong> {newlyCreatedUser.password}
+                  </p>
+                  <button
+                    onClick={() =>
+                      navigator.clipboard.writeText(newlyCreatedUser.password)
+                    }
+                    className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Add Device Form */}
@@ -216,8 +293,6 @@ const AdminDashboard = () => {
           onSubmit={handleAddDevice}
           className="mb-6 flex items-center space-x-4"
         >
-          {errorAdd && <p className="text-red-500 mb-2">{errorAdd}</p>}
-          {successAdd && <p className="text-green-600 mb-2">{successAdd}</p>}
           <input
             type="text"
             placeholder="Enter new device IP"
@@ -235,6 +310,7 @@ const AdminDashboard = () => {
           </button>
         </form>
         {errorAdd && <p className="text-red-600 mb-4">{errorAdd}</p>}
+        {successAdd && <p className="text-green-600 mb-2">{successAdd}</p>}
 
         {/* Overview Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
@@ -377,7 +453,7 @@ const AdminDashboard = () => {
                                           headers: {
                                             Authorization: `Bearer ${token}`,
                                           },
-                                        } // ✅ Added Auth Header
+                                        }
                                       );
                                       setVulnScanResult((prev) => ({
                                         ...prev,
@@ -432,7 +508,6 @@ const AdminDashboard = () => {
                             )}
                           </td>
                         </tr>
-                        {/* ✅ FIX: Show scan result directly below the device row */}
                         {vulnScanResult[ip] && (
                           <tr className="bg-gray-50">
                             <td colSpan="9" className="p-2">
@@ -453,7 +528,6 @@ const AdminDashboard = () => {
                 </tbody>
               </table>
             </div>
-            {/* ❌ REMOVED: The old, separate scan result section is no longer needed. */}
           </div>
         )}
 
